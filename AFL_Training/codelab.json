@@ -1,0 +1,26 @@
+{
+  "environment": "web",
+  "format": "html",
+  "prefix": "https://storage.googleapis.com",
+  "mainga": "UA-49880327-14",
+  "updated": "2022-03-02T18:05:01-08:00",
+  "id": "AFL_Training",
+  "duration": 0,
+  "title": "Introduction to Fuzzing",
+  "summary": "Fuzzing training 101",
+  "source": "codelab.md",
+  "theme": "",
+  "status": [
+    "draft"
+  ],
+  "category": [
+    "afl++",
+    "crashanalysis"
+  ],
+  "tags": [
+    "web"
+  ],
+  "feedback": "https://github.com/intel-innersource/documentation.practices.security.fuzzing",
+  "ga": "Google Analytics ID",
+  "url": "AFL_Training"
+}

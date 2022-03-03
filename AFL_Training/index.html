@@ -1,0 +1,610 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Introduction to Fuzzing</title>
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://storage.googleapis.com/codelab-elements/codelab-elements.css">
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+  <google-codelab codelab-gaid="Google Analytics ID"
+                  id="AFL_Training"
+                  title="Introduction to Fuzzing"
+                  environment="web"
+                  feedback-link="https://github.com/intel-innersource/documentation.practices.security.fuzzing">
+    
+      <google-codelab-step label="Fuzzing with AFL&#43;&#43;" duration="0">
+        <h2 is-upgraded>American Fuzzy Lop plus plus (AFL++)​</h2>
+<p>AFL++ is a fork of AFL with more features and options ​</p>
+<h2 is-upgraded>Features​</h2>
+<ul>
+<li>A fuzzer with many mutators and configurations: afl-fuzz​</li>
+<li>Different source code instrumentation modules: multiple LLVM-based variants, GCC plugin​</li>
+<li>Different binary code instrumentation modules: QEMU mode, Unicorn mode, QBDI mode​</li>
+<li>Utilities for testcase/corpus minimization: afl-tmin, afl-cmin​</li>
+<li>Various helper libraries​</li>
+<li>Reference:<a href="https://github.com/AFLplusplus/AFLplusplus" target="_blank">AFLplusplus</a> ; <a href="https://aflplus.plus/" target="_blank">aflplus.plus</a></li>
+</ul>
+<h2 is-upgraded>AFL++ Operation​</h2>
+<ol type="1">
+<li>Fork a new process (before main() is entered)​</li>
+<li>Fork point can be modified to avoid costly initialization procedures <a href="https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md" target="_blank">README</a>​</li>
+<li>Feed it an input modified by the mutation engine​ <ul>
+<li>Different mutation algorithms are available ​</li>
+<li>Custom mutator interface: <a href="https://aflplus.plus/docs/custom_mutators/%E2%80%8B" target="_blank">custom_mutators</a></li>
+</ul>
+</li>
+<li>Monitor the coverage and notify afl-fuzz about any crashes/hangs​</li>
+<li>Prefer inputs that create additional coverage for next iteration​</li>
+<li>GOTO  1</li>
+</ol>
+<h2 is-upgraded>Fuzzing Harness</h2>
+<ul>
+<li>Can be thought as an &#34;entry point&#34;​</li>
+<li>Accepts testcases from fuzzer and feeds them to the fuzzing target​</li>
+<li>Often based on existing testing/debug interfaces​</li>
+<li>Examples​: <ol type="1">
+<li>Network server-client program: Encapsulation of the server&#39;s client interface that bypasses the actual network communication​</li>
+<li>Image processing library(libpng): A wrapper around an API in the target library that takes png formatted input and performs operations on it</li>
+</ol>
+</li>
+</ul>
+<h2 is-upgraded>AFL++ specific aspects</h2>
+<ul>
+<li>AFL++ is primarily a fuzzer for fuzzing instrumented binaries​</li>
+<li>Instrumentation is done at compile time​</li>
+<li>Target needs to be an executable binary, for which ideally the source code is available (easier instrumentation)​ <ul>
+<li>Network server case: Do not use socket, but feed input to corresponding package parsing code​</li>
+<li>Library case: Binary can internally call the API that needs to be fuzzed​</li>
+<li>Firmware/embedded device case: ​ <ul>
+<li>Emulation using unicorn​</li>
+<li>Rehosting​</li>
+<li>Custom instrumentation and feedback</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 is-upgraded>Example: Fuzzing an file format parser​</h2>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="AFL compiler wrappers​" duration="0">
+        <ul>
+<li>Try to always build a static binary, do not use dynamic linking if somehow possible!​</li>
+<li>Either modify your environment variables, or create a new target​</li>
+</ul>
+<pre><code>CC = clang =&gt; CC = afl-clang-fast ​
+CFLAGS = ... =&gt; CFLAGS = ... -DFUZZING=1​
+...
+</code></pre>
+<ul>
+<li>​or pass the compiler and and flags to your build system. E.g., ​</li>
+</ul>
+<pre><code>CC=afl-clang-fast CXX=afl-clang-fast++ ./configure --disable-shared​
+</code></pre>
+<h2 is-upgraded>Reading input from stdin or files​</h2>
+<p>afl-fuzz expects the target to accept client input either via stdin​</p>
+<pre><code>./your_binary &lt; /PATH/TO/YOUR/INPUT​
+</code></pre>
+<p>or via file​ : Filename is passed via command line arguments​</p>
+<pre><code>./your_binary /PATH/TO/YOUR/INPUT
+</code></pre>
+<h2 is-upgraded>Instrumentation Options​</h2>
+<p class="image-container"><img alt="Instrumentation Options" src="img/7db24feea0ed4cfd.png"></p>
+<h2 is-upgraded>Instrumentation BKMs​</h2>
+<ul>
+<li>Prefer clang over gcc based instrumentation​ <ul>
+<li>Choose afl-clang over afl-gcc​</li>
+</ul>
+</li>
+<li>Prefer instrumation via compiler pass over assembly rewriting​ <ul>
+<li>Choose afl-gcc-fast or afl-clang-fast over afl-gcc or afl-clang​</li>
+</ul>
+</li>
+<li>Evaluate LTO based instrumentation​ <ul>
+<li>Collision-free instrumentation due to global vison of target</li>
+</ul>
+</li>
+</ul>
+<h2 is-upgraded>A note on optimizations​</h2>
+<ul>
+<li>afl compiler wrappers by default set –O3​ <ul>
+<li>Agressive optimization to improve performance​</li>
+<li>This may hide issues hidden in code that is optimized out​ <ul>
+<li>Actually this in itself may hint at a problem in your code​</li>
+</ul>
+</li>
+<li>Suggestion to use the compiler optimization level of your production code​</li>
+<li>You can also completely deactivate optimization by afl compiler wrappers using the AFL_DONT_OPTIMIZE environment variable​</li>
+</ul>
+</li>
+</ul>
+<pre><code>AFL_DONT_OPTIMIZE = 1
+</code></pre>
+<h2 is-upgraded>Fuzzing with AFL++​</h2>
+<p>Once your harness is ready, use afl-fuzz to fuzz it​. In this example we read input via stdin​ <img alt="AFLFuzzing" src="img/5c4b782e1027ce06.png"> Once fuzzer is lauched, you will see the stats: <img alt="AFL++Fuzzing" src="img/4991a9f24a73ad86.png"></p>
+<h2 is-upgraded>AFL++ output folder</h2>
+<ul>
+<li>afl++ output directory contents​ <img alt="AFL++crash" src="img/e2a26734423c5ae9.png"></li>
+<li>Feeding afl++ findings into your target (in this case via stdin)​</li>
+</ul>
+<pre><code>./your_binary &lt; ~/src/out/default/crashes/id:000000,sig:06:src:0000:time:505,op:havoc,rep2
+</code></pre>
+<p>​</p>
+<ul>
+<li>Use your standard debugging tools to dig deeper (e.g., gdb)​</li>
+<li>More details on bug triage in a follow-up training</li>
+</ul>
+<h2 is-upgraded>Scaling fuzzing with AFL++​</h2>
+<ul>
+<li>Fuzzing with one afl++ instance is not sufficient​ <ul>
+<li>afl++ is not multithreaded. Scale by synchronizing multiple afl++ instances​</li>
+<li>afl++ instances are synchronized via the out folder ​</li>
+</ul>
+</li>
+</ul>
+<pre><code>Master fuzzer process:​
+$afl-fuzz –M master -i in/valid -o out -- $PWD/your_binary​
+
+Slave processes:​
+$afl-fuzz –S slaveNNN -i in/valid -o out -- $PWD/your_binary​
+</code></pre>
+<p>​</p>
+<ul>
+<li>Reference: <a href="https://github.com/AFLplusplus/AFLplusplus/blob/stable/docs/fuzzing_in_depth.md#c-using-multiple-cores" target="_blank">Fuzzing in depth</a></li>
+</ul>
+<h2 is-upgraded>Deferred Initialization​</h2>
+<ul>
+<li>afl++ fork server forks before main(...) method is executed​</li>
+<li>This can be inefficient if there in case of  slow intialization code​</li>
+<li>Deferred Initialization provides manual control over fork server​</li>
+<li>Before using this study the following to learn about limitations​ (e.g., for NNN in 000 ... 100) <a href="https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md" target="_blank">README</a></li>
+</ul>
+<pre><code>// ... costly initialization code ...​
+#ifdef __AFL_HAVE_MANUAL_CONTROL​
+
+  __AFL_INIT(); # AFL will start forking the process here​
+
+#endif
+</code></pre>
+<h2 is-upgraded>Persistent Mode</h2>
+<ul>
+<li>Forking is an expensive and slow operation​</li>
+<li>Persistant mode allows feeding multiple inputs into one forked target in a serial fashion ​ <ul>
+<li>Note that input may effect the state of your program ​</li>
+<li>You may have to manually reset the state of your target program between invocations​</li>
+</ul>
+</li>
+<li>Beyond fuzzing in parallel this is the main scaling mechanism of afl++. Use it!</li>
+<li>Reference: <a href="https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md" target="_blank">README</a></li>
+</ul>
+<h2 is-upgraded>Outlook</h2>
+<ul>
+<li>afl++ can and should be used with Sanitizers for more efficient bug hunting​</li>
+<li>Coverage analysis is a useful tool to identify roadblocks for afl++​</li>
+<li>More advanced topics are discussed in the afl++ documentation</li>
+<li>Reference: <a href="https://github.com/AFLplusplus/AFLplusplus/blob/stable/docs/fuzzing_in_depth.md" target="_blank">Fuzzing in Depth</a></li>
+</ul>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Introduction to Sanitizers" duration="0">
+        <ul>
+<li>A dynamic analysis tool to detect low level violations​ <ul>
+<li>For example:  memory safety/type safety violations​</li>
+</ul>
+</li>
+<li>Doesn&#39;t aim for program properties​</li>
+<li>Popular Sanitizers: Address Sanitizer, Undefined Behavior Sanitizer etc.​</li>
+<li>AFL++ can be paired with different sanitizers to enhance crash-detection capability</li>
+</ul>
+<h2 is-upgraded>AddressSanitizer (aka ASan)​</h2>
+<ul>
+<li>Detects memory errors by placing red zones​</li>
+<li>Typical slowdown is 2x​</li>
+<li>Flag: -fsanitize=address​</li>
+<li>Can detect​ <ul>
+<li>Out-of-bounds accesses to heap, stack and globals​</li>
+<li>Use-after-free​</li>
+<li>Use-after-return ​</li>
+<li>Use-after-scope ​</li>
+<li>Double-free, invalid free​</li>
+</ul>
+</li>
+<li>Can use massive amounts of memory​ <ul>
+<li>Use –m32 compiler flag to compile 32-bit version of target if possible! <strong>stack-buffer overflow</strong></li>
+</ul>
+</li>
+</ul>
+<pre><code>int main(in argc, char **argv) {​
+       int buffer[20];​
+       buffer[1] = 0;​
+       return buffer[argc+20];​
+}
+</code></pre>
+<pre><code>% clang –fsanitize=address ./stack_overflow.
+</code></pre>
+<p class="image-container"><img alt="stackbO" src="img/f818a9d89436cdca.png"></p>
+<h2 is-upgraded>MemorySanitizer (aka MSan)​</h2>
+<ul>
+<li>Detects uninitialized reads​</li>
+<li>Tags memory allocations and flags uninitialized reads ​</li>
+<li>Slowdown is around 3x​</li>
+<li>Only supported in 64 bit mode​</li>
+<li>Flag: -fsanitize=memory</li>
+</ul>
+<pre><code>#define SIZE 20​
+int main(int argc, char** argv) {​
+
+  int* a = malloc(SIZE);​
+
+  a[5] = 0;​
+
+  if (a[argc])​
+
+    printf(&#34;xx\n&#34;);​
+
+  return 0;​
+
+}​
+</code></pre>
+<p class="image-container"><img alt="memory Sanitizer" src="img/113a84c47d8f1ea9.png"></p>
+<h2 is-upgraded>Undefined Behavior Sanitizer (aka UBSan)​</h2>
+<ul>
+<li>Detects typical undefined behavior in C/C++ programs​</li>
+<li>Slowdown usually depends on the number of checks​</li>
+<li>Flag: -fsanitize=undefined​</li>
+<li>Detects errors such as​</li>
+<li>Using misaligned or null pointer​</li>
+<li>Signed integer overflow​</li>
+<li>Conversion to, from, or between floating-point types which would overflow the destination</li>
+</ul>
+<pre><code> int main(int argc, char **argv) {​
+
+  int k = 0x7fffffff;​
+
+  k += argc;​
+
+  return 0;​
+
+}
+</code></pre>
+<p class="image-container"><img alt="AFL ++ UBSAN" src="img/938bfa16f79634df.png"></p>
+<h2 is-upgraded>Leak Sanitizer</h2>
+<ul>
+<li>Detects run-time memory leaks​</li>
+<li>No performance overhead until the very end of the process​</li>
+<li>Flag: -fsanitize=leak</li>
+</ul>
+<pre><code>void *p;​
+
+int main() {​
+
+  p = malloc(7);​
+
+  p = 0; ​
+
+  return 0;​
+
+}
+</code></pre>
+<p class="image-container"><img alt="AFL ++ LEAK" src="img/4b0c95530472baef.png"></p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="AFL&#43;&#43; and Sanitizers" duration="0">
+        <p class="image-container"><img alt="AFL ++ SANITIZER" src="img/ef6e6fa47e8894c2.png"></p>
+<ul>
+<li>Activate sanitizers via environment variable when compiling​</li>
+<li>We recommend to not use multiple sanitizers in one fuzzer instance since it may cause the fuzzer to miss issues​</li>
+<li>When fuzzing in parallel, you can and should use different sanitizers on different afl++ instances​</li>
+<li>Reference: <a href="https://github.com/AFLplusplus/AFLplusplus#c-sanitizers%E2%80%8B" target="_blank">c-sanitizers</a></li>
+</ul>
+<h2 is-upgraded>AFL++ and Sanitizers – what works well</h2>
+<p><strong>Automation</strong>​</p>
+<ul>
+<li>It is fast, efficient, effective​</li>
+<li>Easier to verify bug fixes (just re-run the test with the input that caused a crash)​</li>
+</ul>
+<p><strong>Certain types of code lend themselves well to such analysis ​</strong></p>
+<ul>
+<li>Parsers: network packets, files, user input​</li>
+<li>Servers: with transformation to take input from a file rather than a network socket​</li>
+<li>Libraries: cryptography utilities, string utilities, file-manipulation utilities, data encoding utilities​</li>
+</ul>
+<h2 is-upgraded>AFL++ and Sanitizers - Limitations</h2>
+<ul>
+<li>Does not catch direct logical/semantic errors ​ <ul>
+<li>Reading the wrong bit in a register, wrong branching in code​</li>
+</ul>
+</li>
+<li>Long execution time​ <ul>
+<li>For effective coverage, depending on code depth, needs to run for a long time.​</li>
+<li>Can be mitigated by parallelization and limiting scope​</li>
+</ul>
+</li>
+<li>Does not catch ‘All&#39; buffer errors​ <ul>
+<li>AFL attempts to hit every branch of code​</li>
+<li>When a branch is hit, even if a bug exists, a crash only occurs if AFL uses the correct (malformed) input​</li>
+</ul>
+</li>
+</ul>
+<p>​</p>
+<pre><code>Input: buffer (variable length: 1-10)​
+msg_id = buffer[0]​
+if (msg_id == 1)​
+            temp = buf[5]​     ----&gt; //When AFL hits this branch, it should use an input that is lesser than 6 bytes long to trigger a crash. But this may not always be the case.
+else if (msg_id == 2)​
+                 temp = buf[9]​
+else if (msg_id == 3)​
+                 temp = buf[1]
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Bug Triage" duration="0">
+        <h2 is-upgraded>Ways to triage Bugs</h2>
+<ul>
+<li>Trace collection of crashes</li>
+<li>Crash statistics</li>
+</ul>
+<h2 is-upgraded>Example: Stack Buffer Overflow</h2>
+<p><img alt="stackbufferoverflow" src="img/12589ffe15f4d476.png"><strong>Output directory</strong>:​ Contains information specific to crashes and interesting inputs <img alt="output directory" src="img/3ea715ed96bde4e6.png"><strong>Crashes</strong>: Number of unique crashes plus an auto-generated README.txt file <img alt="Crashes" src="img/99256325fade68cd.png"><strong>Fuzzer_stats</strong><img alt="Fuzzer Stats" src="img/88c75bf0fc93cd5e.png"></p>
+<h2 is-upgraded>Reproducing the crashes</h2>
+<pre><code>$$ gdb ./server​
+
+$$ r &lt; id:000000,sig:06,src:000000,time:505,op:havoc,rep:2​
+</code></pre>
+<p>​   <img alt="Reproducing Crashes" src="img/aee5ba3b7b95ae75.png"></p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Coverage Analysis​" duration="0">
+        <p><strong>Coverage</strong>: Measurement of code segments explored by the fuzzing mechanism​</p>
+<ul>
+<li>Widely used as part of software testing to discover untested code segment​</li>
+<li>This information is used to make informed decisions about which inputs to mutate <strong>Intuition: A software flaw is only detected if the flawed statement is executed. Effectiveness of test suite therefore depends on how many statements are executed</strong></li>
+<li>How can we that ensure we have tested a function/code segment &#34;enough&#34;?​</li>
+<li>We need a metric to establish the ground truth​</li>
+<li>Coverage helps us to establish that truth​</li>
+</ul>
+<h2 is-upgraded>How to Collect Coverage</h2>
+<ul>
+<li>Several tools are available​ <ul>
+<li><a href="https://gcc.gnu.org/onlinedocs/gcc/Gcov.html" target="_blank">gcov</a> ​</li>
+<li><a href="https://clang.llvm.org/docs/SourceBasedCodeCoverage.html%E2%80%8B" target="_blank">SanitizerCoverage</a></li>
+<li><a href="https://github.com/vanhauser-thc/afl-cov%E2%80%8B" target="_blank">afl-cov</a></li>
+</ul>
+</li>
+<li>For afl++-based fuzzing afl-cov is the most interesting one</li>
+</ul>
+<h2 is-upgraded>afl-cov in practice</h2>
+<ul>
+<li>Compile a copy of the target with coverage collection enabled​</li>
+</ul>
+<pre><code>$ LDFLAGS=&#34;-lgcov --coverage&#34; afl-clang-fast -fprofile-arcs -ftest-coverage -DFUZZING=1 ​your_program.c –o your_binary.cov​
+</code></pre>
+<ul>
+<li>Run afl-cov.sh script afl-cov on output from fuzzing campaign​</li>
+</ul>
+<pre><code>$ afl-cov.sh -c out/ &#34;./your_binary.cov &lt; @@&#34;​
+</code></pre>
+<ul>
+<li>In this example input is expected via stdin. @@ will be replaced with the input vectors​</li>
+<li>afl-cov.sh will feed the input vectors into the binary and collect coverage information​</li>
+</ul>
+<h2 is-upgraded>afl-cov in practice​</h2>
+<ul>
+<li>afl-cov will generate a standard lcov report​</li>
+<li>This gives an indication about areas that have not been explored by the afl++​</li>
+<li>Helps to identify fuzzing roadblocks <img alt="afl-cov" src="img/f0ebfd040f0d38a9.png"></li>
+</ul>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Accessing IPAS Lab Environment" duration="0">
+        <h2 is-upgraded>Setup</h2>
+<p>Use a recent browser to go to:​ <a href="https://ipas-osr-lab.jf.intel.com/%E2%80%8B" target="_blank">https://ipas-osr-lab.jf.intel.com/​</a></p>
+<p>Please login with the username and password provided to you.​</p>
+<p>If your connection gets dropped just reopen the page again and you should be dropped into the same session.​ <img alt="afl-ipasdemo" src="img/63f9cfb9d161ad26.png"> ​</p>
+<h2 is-upgraded>Enable copy/paste</h2>
+<ul>
+<li>Enable clipboard access in your browser to be able to copy/paste from / to your local machine​</li>
+<li>​Copy and paste works like you would expect on a Linux machine​ <ul>
+<li>Press and hold left mouse button to select text​</li>
+<li>Press right mouse button to paste <img alt="afl-copypaste" src="img/eee60f6da5db152.png"></li>
+</ul>
+</li>
+</ul>
+<h2 is-upgraded>Logging in</h2>
+<p>You will be dropped into a bash shell on your dedicated environment. This is a Ubuntu 20.04 VM which we can export to you after the training if needed. ​</p>
+<p>Note: This machine has Internet access via proxy-dmz.intel.com.​</p>
+<p>​<strong>DISCLAIMER: DO NOT STORE OR ACCESS ANY INTEL TOP SECRET MATERIAL ON THIS VM IN THIS ENVIRONMENT!</strong></p>
+<p class="image-container"><img alt="afl-ipaslogin" src="img/57d24bf85ce5ae6c.png"></p>
+<h2 is-upgraded>Toggle screens</h2>
+<p>Use ++ to toggle the remote access settings. Here you can increase the font size if needed.​</p>
+<p>Note that your browser may capture some common keyboard shortcuts, such as CTRL-W (close browser tab / search in nano editor). <img alt="afl-ipastoggle" src="img/78e704b4cf90dc80.png"></p>
+<h2 is-upgraded>Deployed software and exercises</h2>
+<ul>
+<li>You should not need to install any additional software.​</li>
+<li>Common preinstalled editors:​ <ul>
+<li>vi(m)​</li>
+<li>emacs​</li>
+<li>nano – note that ctrl-w closes the browser tab!​</li>
+<li>hexcurse (F1 for help)​</li>
+</ul>
+</li>
+<li>Training exercises are in the src directory in your home directory​</li>
+<li>Solutions for the exercises are available in the src/exercises folder. Please try to solve the exercises without looking at the solutions first.</li>
+</ul>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Accessing OneCloud Lab Environment" duration="0">
+        
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="AFL&#43;&#43; Fuzzing Exercise" duration="0">
+        <h2 is-upgraded>Target: Simple network server</h2>
+<ul>
+<li>Code is deployed in the <strong>/home/afl/src</strong> directory​</li>
+<li>Network server: <strong>fuzzingtarget.c</strong> is the network server​</li>
+<li>Client: <strong>client.c</strong> is the network client​</li>
+<li>Useful common logic: <strong>common.c​</strong></li>
+<li>Example valid and invalid input in <strong>src/in</strong> directory​</li>
+<li>Makefile for GNU make​ ​Note: The target contains some code that is disabled via #ifdefs (e.g., CRC32 input checking). Please ignore this for this for now!</li>
+</ul>
+<h2 is-upgraded>Input Structure</h2>
+<ul>
+<li>Fixed 32 byte input expected from client​ <img alt="afl-inputstructure" src="img/5bf1953b9993f5c4.png"></li>
+<li>Command Handlers for different commands ​ <ul>
+<li>Command 0...4 are supported​</li>
+<li>Functions cmd0(...) ... cmd4(...)​</li>
+</ul>
+</li>
+<li>No „real program logic&#34; implemented, only some potential vulnerabilities in the cmd0(...) ... cmd4(...) command handlers</li>
+</ul>
+<h2 is-upgraded>Task: Server reading input from stdin​</h2>
+<ul>
+<li>Client reads input from stdin, server from network socket​</li>
+<li>Valid inputs are provided in the src/in/valid directory</li>
+</ul>
+<pre><code>./client &lt; in/valid/INPUT_VECTOR
+</code></pre>
+<p>Modify the server to read input for the parse(...) method from stdin instead of from a network socket. Reuse the client codebase. When done, you should be able to call the server like this:</p>
+<pre><code>./server &lt; in/valid/INPUT_VECTOR
+</code></pre>
+<h2 is-upgraded>Task: Compile server with afl-clang-fast instead of clang​</h2>
+<ul>
+<li>Use and extend the provided Makefile​ <ul>
+<li>You can use the <strong>server</strong> target as a template to define a <strong>server-afl</strong> target​</li>
+</ul>
+</li>
+<li>Use the <strong>afl-clang-fast</strong> compiler wrapper instead of <strong>clang​</strong><ul>
+<li>LTO based implementation (afl-clang-lto) seems a little unstable​</li>
+</ul>
+</li>
+<li>Note: set the following <strong>environment variable</strong> when compiling. This is needed since the afl++ compiler wrappers set –O3 by default which can lead to false negatives!​</li>
+</ul>
+<pre><code>AFL_DONT_OPTIMIZE = 1
+</code></pre>
+<h2 is-upgraded>Task: Run afl-fuzz to fuzz the server</h2>
+<ul>
+<li>Once your harness is ready, use afl-fuzz to fuzz it​</li>
+<li>Read input via stdin! See client code. <img alt="afl-server" src="img/6c3a9f39451a2d0d.png"></li>
+</ul>
+<h2 is-upgraded>Solution</h2>
+<ul>
+<li>Please try to solve the exercise yourself​</li>
+<li>If you are stuck, ask for help and/or take a look at the solution provided in <strong>/home/afl/src/solution</strong></li>
+</ul>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="AFL&#43;&#43; Fuzzing (with Sanitizers) Exercise" duration="0">
+        <h2 is-upgraded>Task: Compile with sanitizers enabled​</h2>
+<ul>
+<li>When using AFL++ compiler wrappers sanitizers are enabled via environment variables​ <ul>
+<li>This replaces explicit the –fsanitize=... compiler option​</li>
+<li>Don‘t forget to use –m32 compiler option!</li>
+</ul>
+</li>
+</ul>
+<pre><code># Enable Address Sanitizer​
+AFL_USE_ASAN=1 AFL_DONT_OPTIMIZE=1 afl-clang-fast –m32 ...​
+# Enable Undefined Behavior Sanitizer​
+AFL_USE_UBSAN=1 AFL_DONT_OPTIMIZE=1 afl-clang-fast –m32 ... ​
+# Enable Leak Sanitizer​
+AFL_USE_LSAN=1 AFL_DONT_OPTIMIZE=1 afl-clang-fast –m32 ...​
+...
+</code></pre>
+<h2 is-upgraded>Example for afl with ASAN</h2>
+<pre><code># Enable Address Sanitizer​
+AFL_USE_ASAN=1 AFL_DONT_OPTIMIZE=1 afl-clang-fast -Wall -DFUZZING=1 -m32  fuzzingtarget.c ErriezCRC32.c common.c -o server​
+
+# Start fuzzing​
+afl-fuzz -i in/valid -o out -- $PWD/server
+</code></pre>
+<h2 is-upgraded>Task: Compile with sanitizers enabled</h2>
+<ul>
+<li>Do not use multiple sanitizers on one target and afl-fuzz instance​</li>
+<li>When fuzzing in parallel with multiple afl-fuzz instances you can (and should) run multiple instances with different sanitizers​</li>
+<li>Modify the Makefile to create one ore more of the following targets​ <ul>
+<li><strong>afl-fuzz-asan</strong> – for creating a target instrumented with ASAN​</li>
+<li><strong>afl-fuzz-ubsan</strong> – for creating a target instrumented with UBSAN​</li>
+<li><strong>afl-fuzz-lsan</strong> – for creating a target instrumented with LSAN​</li>
+</ul>
+</li>
+<li>Compile the target(s)​</li>
+<li>Run afl-fuzz as outlined before on one of the targets​</li>
+<li>Collect crash information</li>
+</ul>
+<h2 is-upgraded>Task: Collect crash information</h2>
+<ul>
+<li>After running afl for a few minutes afl++ should start collecting crashes​</li>
+<li>When crashes / sanitizer notifications are observed they are captured in src/out/default/crashes​</li>
+<li>Manually feed the output in src/out/default/crashes into the instrumented server <img alt="afl-crash-info" src="img/97f5b13786e87a88.png"></li>
+</ul>
+<h2 is-upgraded>Task: Analyze crashes</h2>
+<p>Example: Output from UBSAN instrumented binary</p>
+<pre><code>./server &lt; out/default/crashes/id:000000,sig:04,src:000004,time:49,op:MOpt_havoc,rep:8
+
+Output:
+Input file length: 32​
+magic word found​
+ opcode: 0​
+ cmdlen: b (11)​
+ cmd: aabb29dd003400ffffff35064000000000​
+ cmd0 length 11​
+fuzzingtarget.c:39:24: runtime error: index 4 out of bounds for type &#39;char [4]&#39;​
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior fuzzingtarget.c:39:24 in aabb29dd003400ffff
+</code></pre>
+<h2 is-upgraded>afl-cov in practice</h2>
+<ul>
+<li>Output will be created in  out/default/cov/web/​ <ul>
+<li>Open in browser or expose via webserver (e.g., using python http.server)​</li>
+<li>Use your server‘s hostname to figure out the URL to access the web interface:</li>
+</ul>
+</li>
+</ul>
+<pre><code>python3 -m http.server --directory out/default/cov/web/
+</code></pre>
+<p class="image-container"><img alt="afl-cov" src="img/df795510248b8499.png"></p>
+
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://storage.googleapis.com/codelab-elements/native-shim.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/custom-elements.min.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/prettify.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/codelab-elements.js"></script>
+  <script src="//support.google.com/inapp/api.js"></script>
+
+</body>
+</html>
